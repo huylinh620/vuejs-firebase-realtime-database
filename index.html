@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Vuejs Chat Room</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/native-toast@2.0.0/dist/native-toast.css">
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
+  <script src="https://unpkg.com/native-toast@2.0.0/dist/native-toast.js"></script>
+</head>
+<body>
+<div id="chat" class="container">
+  <h1>Vuejs Chat Room</h1>
+  <!-- Messages -->
+  <div v-for="message in messages" class="card">
+    <div class="card-body">
+      <!-- nickname -->
+      <h6 class="card-subtitle mb-2 text-muted">{{ message.nickname }}</h6>
+      <!-- content -->
+      <p v-if="message !== editingMessage" class="card-text">{{ message.text }}</p>
+      <textarea v-else v-model="messageText" class="form-control"></textarea>
+      <!-- actions -->
+      <div v-if="message !== editingMessage">
+        <a @click.prevent="editMessage(message)" class="card-link" href="#">Edit</a>
+        <a @click.prevent="deleteMessage(message)" class="card-link" href="#">Delete</a>
+      </div>
+      <div v-else>
+        <a @click.prevent="cancelEditing" class="card-link" href="#">Cancel</a>
+        <a @click.prevent="updateMessage(message)" class="card-link" href="#">Update</a>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+  <!-- New Message -->
+  <form v-if="!editingMessage" @submit.prevent="storeMessage">
+    <div class="form-group">
+      <label>Message:</label>
+      <textarea v-model="messageText" class="form-control"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Nickname:</label>
+      <input v-model="nickname" class="form-control"/>
+    </div>
+    <button class="btn btn-primary">Send</button>
+  </form>
+</div>
+
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-analytics.js";
+  import { 
+    getDatabase,
+    ref,
+    onChildAdded,
+    onChildRemoved,
+    onChildChanged,
+    child,
+    push,
+    update,
+    remove 
+  } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-database.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyAXMgiooqhQqwjDYOXaCHu557DdSu_pLMo",
+    authDomain: "huylinh620-vue-chat-room.firebaseapp.com",
+    databaseURL: "https://huylinh620-vue-chat-room-default-rtdb.firebaseio.com",
+    projectId: "huylinh620-vue-chat-room",
+    storageBucket: "huylinh620-vue-chat-room.appspot.com",
+    messagingSenderId: "568339947758",
+    appId: "1:568339947758:web:df73cbd92dd6f9b3d1d3ff",
+    measurementId: "G-QZ99BT3YQK"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+
+  const database = getDatabase(app);
+  const messagesRef = ref(database, 'messages')
+
+  new Vue({
+    el: "#chat",
+
+    data: {
+      messages: [],
+      messageText: '',
+      nickname: 'hootlex',
+      editingMessage: null
+    },
+
+    methods: {
+      storeMessage () {
+        push(messagesRef, {text: this.messageText, nickname: this.nickname})
+        this.messageText = ''
+      },
+      editMessage(message) {
+        this.editingMessage = message
+        this.messageText = message.text
+      },
+      cancelEditing() {
+        this.editingMessage = null
+        this.messageText = ''
+      },
+      updateMessage(message) {
+        update(child(messagesRef, this.editingMessage.id), {text: this.messageText})
+        this.cancelEditing()
+      },
+      deleteMessage(message) {
+        remove(child(messagesRef, message.id))
+      }
+    },
+
+    created() {
+      onChildAdded(messagesRef, snapshot => {
+        const data = snapshot.val();
+        this.messages.push({...data, id: snapshot.key})
+        if (snapshot.val().nickname !== this.nickname) {
+          nativeToast({
+            message: `New message by ${snapshot.val().nickname}`,
+            position: 'north-east',
+            timeout: 3000,
+            type: 'success'
+          })
+        }
+      })
+
+      onChildRemoved(messagesRef, (snapshot) => {
+        const deletedMessage = this.messages.find(message => message.id === snapshot.key)
+        const index = this.messages.indexOf(deletedMessage)
+        this.messages.splice(index, 1)
+        if (snapshot.val().nickname !== this.nickname) {
+          nativeToast({
+            message: `Message deleted by ${snapshot.val().nickname}`,
+            position: 'north-east',
+            timeout: 3000,
+            type: 'warning'
+          })
+        }
+      })
+
+      onChildChanged(messagesRef, (snapshot) => {
+        const updatedMessage = this.messages.find(message => message.id === snapshot.key)
+        updatedMessage.text = snapshot.val().text
+        if (snapshot.val().nickname !== this.nickname) {
+          nativeToast({
+            message: `Message edited by ${snapshot.val().nickname}`,
+            position: 'north-east',
+            timeout: 3000,
+            type: 'info'
+          })
+        }
+      })
+    }
+  })
+</script>
+</body>
+</html>
